@@ -6,8 +6,9 @@ SOURCES = [
     {
         "city": "Austin",
         "state": "TX",
-        "intakes_url": "https://data.austintexas.gov/resource/9t4d-g238.json",
-        "outcomes_url": "https://data.austintexas.gov/resource/u3f4-9qnu.json",
+        # Historical datasets (Oct 2013 – May 2025), consistent A###### animal ID format
+        "intakes_url": "https://data.austintexas.gov/resource/wter-evkm.json",
+        "outcomes_url": "https://data.austintexas.gov/resource/9t4d-g238.json",
     },
     # Add more cities by appending entries here, e.g.:
     # {
