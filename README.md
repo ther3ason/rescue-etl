@@ -1,78 +1,64 @@
 # Rescue Animal ETL Pipeline
 
-A Data Engineering portfolio project that extracts dog and cat rescue listings from the [Petfinder API](https://www.petfinder.com/developers/), transforms the raw data into a clean tabular format, and loads it into a local SQLite database.
+A Data Engineering portfolio project that extracts animal shelter intake and outcome records from municipal open data portals (via the Socrata API), joins them to compute shelter metrics, and loads the result into a local SQLite database.
+
+**No API key required.** Data is sourced from publicly funded city open data portals.
 
 ## Project Structure
 
 ```
 rescue-etl/
 ├── src/
-│   ├── extract.py      # Pulls raw animal records from the Petfinder API
-│   ├── transform.py    # Flattens and cleans records into a pandas DataFrame
-│   └── load.py         # Upserts the DataFrame into a SQLite database
-├── main.py             # Orchestrates the full ETL pipeline
-├── requirements.txt
-└── .env.example
+│   ├── extract.py      # Paginated Socrata API fetcher (multi-city config)
+│   ├── transform.py    # Schema normalization, join, and derived metrics
+│   └── load.py         # Full-refresh load into SQLite
+├── main.py             # Pipeline orchestrator
+└── requirements.txt
 ```
+
+## Data Sources
+
+| City | Portal | Datasets |
+|---|---|---|
+| Austin, TX | data.austintexas.gov | Animal Center Intakes + Outcomes |
+
+The pipeline is designed to support multiple cities — add a new source by appending an entry to the `SOURCES` list in `src/extract.py`.
 
 ## Setup
 
-1. **Clone the repo and install dependencies:**
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **Create a `.env` file** from the example template:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-3. **Register for a free Petfinder API key** at https://www.petfinder.com/developers/ and add your credentials to `.env`:
-
-   ```
-   PETFINDER_API_KEY=your_api_key_here
-   PETFINDER_SECRET=your_secret_here
-   ```
-
-## Usage
-
-Run the full pipeline:
-
 ```bash
+pip install -r requirements.txt
 python main.py
 ```
 
-This will:
-1. Authenticate with the Petfinder API and fetch dog and cat listings (up to 3 pages each by default)
-2. Flatten nested JSON fields, parse timestamps, and deduplicate records
-3. Write the results to `rescue.db` (SQLite) in an `animals` table
+Results are written to `rescue.db`.
 
 ## Schema
 
 | Column | Type | Description |
 |---|---|---|
-| id | INTEGER (PK) | Petfinder animal ID |
+| animal_id | TEXT | Shelter-assigned ID |
+| source_city / source_state | TEXT | Which city's data portal |
 | name | TEXT | Animal's name |
-| type | TEXT | `Dog` or `Cat` |
-| breed_primary | TEXT | Primary breed |
-| age | TEXT | `Baby`, `Young`, `Adult`, `Senior` |
+| animal_type | TEXT | `Dog` or `Cat` |
+| breed | TEXT | Breed description |
+| color | TEXT | Color description |
 | gender | TEXT | `Male` or `Female` |
-| size | TEXT | `Small`, `Medium`, `Large`, `Extra Large` |
-| status | TEXT | `adoptable`, `adopted`, etc. |
-| spayed_neutered | INTEGER | Boolean |
-| house_trained | INTEGER | Boolean |
-| org_id | TEXT | Rescue organization ID |
-| city / state | TEXT | Location |
-| published_at | TEXT | ISO 8601 timestamp |
-| url | TEXT | Petfinder listing URL |
+| neutered | INTEGER | 1 = fixed, 0 = intact |
+| age_upon_intake | TEXT | e.g. `2 years`, `4 months` |
+| intake_type | TEXT | `Stray`, `Owner Surrender`, etc. |
+| intake_condition | TEXT | `Normal`, `Injured`, etc. |
+| intake_datetime | TEXT | ISO 8601 |
+| outcome_type | TEXT | `Adoption`, `Transfer`, `Return to Owner`, etc. |
+| outcome_subtype | TEXT | Additional outcome detail |
+| outcome_datetime | TEXT | ISO 8601 (`NULL` if still in shelter) |
+| days_in_shelter | REAL | Outcome datetime − intake datetime in days |
 
-## Why This Project
+## What This Demonstrates
 
-This pipeline demonstrates core data engineering skills:
-- **REST API authentication** (OAuth2 client credentials flow)
-- **Incremental extraction** with pagination
-- **Data normalization** of nested JSON using pandas
-- **Relational storage** with SQLite
-- **Environment-based configuration** for secrets management
+- **Multi-endpoint extraction** with paginated Socrata API calls
+- **Schema normalization** — parsing free-text fields (e.g. `"Neutered Male"` → `gender=Male, neutered=1`)
+- **Dataset joining** — intakes left-joined to latest outcome per animal, enabling time-to-adoption analysis
+- **Derived metrics** — `days_in_shelter` computed from joined timestamps
+- **Full-refresh load pattern** with explicit DDL and SQLite upsert safety
+- **Config-driven multi-source design** — adding a new city requires one dict entry

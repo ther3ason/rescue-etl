@@ -5,10 +5,10 @@ from src.load import load
 
 def run_pipeline():
     print("=== Extract ===")
-    raw_data = extract()
+    raw = extract()
 
     print("\n=== Transform ===")
-    df = transform(raw_data)
+    df = transform(raw)
 
     print("\n=== Load ===")
     load(df)
