@@ -21,16 +21,17 @@ SOURCES = [
 PAGE_SIZE = 1000
 
 
-def fetch_socrata(url: str) -> list[dict]:
-    """Paginate through a Socrata endpoint and return all records."""
+def fetch_socrata(url: str, limit: int) -> list[dict]:
+    """Paginate through a Socrata endpoint, stopping at limit records."""
     records = []
     offset = 0
     domain = url.split("/")[2]
 
-    while True:
+    while len(records) < limit:
+        batch_size = min(PAGE_SIZE, limit - len(records))
         response = requests.get(
             url,
-            params={"$limit": PAGE_SIZE, "$offset": offset, "$order": ":id"},
+            params={"$limit": batch_size, "$offset": offset, "$order": ":id"},
             timeout=30,
         )
         response.raise_for_status()
@@ -39,14 +40,14 @@ def fetch_socrata(url: str) -> list[dict]:
             break
         records.extend(batch)
         print(f"  {domain}: {len(records)} records fetched...")
-        if len(batch) < PAGE_SIZE:
+        if len(batch) < batch_size:
             break
-        offset += PAGE_SIZE
+        offset += batch_size
 
     return records
 
 
-def extract() -> dict[str, list[dict]]:
+def extract(limit: int = 1000) -> dict[str, list[dict]]:
     """Fetch intakes and outcomes from all configured sources."""
     all_intakes = []
     all_outcomes = []
@@ -55,14 +56,14 @@ def extract() -> dict[str, list[dict]]:
         city, state = source["city"], source["state"]
 
         print(f"\n[{city}, {state}] Fetching intakes...")
-        intakes = fetch_socrata(source["intakes_url"])
+        intakes = fetch_socrata(source["intakes_url"], limit=limit)
         for r in intakes:
             r["_source_city"] = city
             r["_source_state"] = state
         all_intakes.extend(intakes)
 
         print(f"[{city}, {state}] Fetching outcomes...")
-        outcomes = fetch_socrata(source["outcomes_url"])
+        outcomes = fetch_socrata(source["outcomes_url"], limit=limit)
         for r in outcomes:
             r["_source_city"] = city
             r["_source_state"] = state
